@@ -659,7 +659,7 @@ CATEGORY_PRODUCT_MAP = {
 }
 
 
-def get_products_for_category(category: str, budget: Optional[float] = None, quantity: int = 1) -> List[Dict[str, Any]]:
+def get_products_for_category(category: str, budget: Optional[Any] = None, quantity: Any = 1) -> List[Dict[str, Any]]:
     """Return filtered demo products for a category."""
     category = category.lower().strip()
     products = CATEGORY_PRODUCT_MAP.get(category, [])
@@ -670,8 +670,18 @@ def get_products_for_category(category: str, budget: Optional[float] = None, qua
                 products = prods
                 break
 
-    if budget and products:
-        unit_budget = budget / max(quantity, 1)
+    try:
+        qty = int(quantity) if quantity is not None else 1
+    except (ValueError, TypeError):
+        qty = 1
+
+    try:
+        b_val = float(budget) if budget is not None else None
+    except (ValueError, TypeError):
+        b_val = None
+
+    if b_val and b_val > 0 and products:
+        unit_budget = b_val / max(qty, 1)
         products = [p for p in products if p.get("price_num", 0) <= unit_budget * 1.2]
 
     return products

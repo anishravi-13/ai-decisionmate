@@ -9,6 +9,34 @@ from schemas import FactorScore, AlternativeOption, DecisionResult, ImpactAnalys
 from product_catalog import get_products_for_category, DEMO_LAPTOPS, DEMO_PHONES
 
 
+def _safe_float(val: Any, default: float = 0.0) -> float:
+    """Safely convert any value (string, int, float, None) to float."""
+    if val is None or val == "":
+        return default
+    try:
+        if isinstance(val, (int, float)):
+            return float(val)
+        cleaned = re.sub(r"[^\d.]", "", str(val))
+        return float(cleaned) if cleaned else default
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_int(val: Any, default: int = 1) -> int:
+    """Safely convert any value to int."""
+    if val is None or val == "":
+        return default
+    try:
+        if isinstance(val, int):
+            return val
+        if isinstance(val, float):
+            return int(val)
+        cleaned = re.sub(r"[^\d]", "", str(val))
+        return int(cleaned) if cleaned else default
+    except (ValueError, TypeError):
+        return default
+
+
 # ─── Category Detection ───────────────────────────────────────────────────────
 
 CATEGORY_KEYWORDS: Dict[str, List[str]] = {
@@ -276,7 +304,7 @@ def extract_health_entities(text: str) -> Dict[str, Any]:
 
 def score_laptop(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
     """Score laptop decision factors."""
-    budget = answers.get("budget", 0) or 0
+    budget = _safe_float(answers.get("budget", 0))
     usage = answers.get("usage", "general")
     ram_req = answers.get("ram_requirement", "8gb")
     performance = answers.get("performance_priority", "medium")
@@ -336,8 +364,8 @@ def score_laptop(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
 
 
 def score_company_bulk(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
-    budget = float(answers.get("total_budget", 0) or 0)
-    quantity = int(answers.get("quantity", 1) or 1)
+    budget = _safe_float(answers.get("total_budget", 0) or answers.get("budget", 0))
+    quantity = _safe_int(answers.get("quantity", 1))
     product_cat = answers.get("product_category", "laptop")
     perf_req = answers.get("performance_requirements", "medium")
     warranty = answers.get("warranty_importance", "medium")
@@ -610,7 +638,7 @@ def score_pet(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
     living = str(answers.get("living_situation", "apartment_large")).lower()
     activity = str(answers.get("activity_level", "medium")).lower()
     time_comm = str(answers.get("time_commitment", "medium")).lower()
-    monthly_budget = float(answers.get("budget", 0) or 0)
+    monthly_budget = _safe_float(answers.get("budget", 0))
     pet_type = answers.get("pet_type", "dog")
 
     if breed_key and breed_key != "recommend" and breed_key in BREED_PROFILES:
@@ -762,13 +790,13 @@ def score_health(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
 
 def score_general(category: str, answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
     """Generic scoring for any category."""
-    budget = answers.get("budget", 0) or 0
+    budget = _safe_float(answers.get("budget", 0))
     requirements = answers.get("requirements", [])
     if isinstance(requirements, str):
         requirements = [requirements]
     pref_count = len(requirements)
 
-    budget_score = 70 if budget == 0 else min(95, 60 + (budget / 10000))
+    budget_score = 70 if budget <= 0 else min(95, 60 + (budget / 10000))
     req_score = min(90, 50 + pref_count * 10)
     completeness = min(85, 40 + len([v for v in answers.values() if v]) * 8)
 
@@ -823,7 +851,7 @@ def compute_confidence(avg_score: float, answers: Dict[str, Any]) -> Tuple[float
 # ─── Recommendation Generation ────────────────────────────────────────────────
 
 def generate_laptop_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
-    budget = float(answers.get("budget", 0) or 0)
+    budget = _safe_float(answers.get("budget", 0))
     gaming = str(answers.get("gaming_requirement", "no")).lower() in ["yes", "true", "1"]
     ai_ml = str(answers.get("ai_ml_requirement", "no")).lower() in ["yes", "true", "1"]
     portability = str(answers.get("portability", "medium")).lower()
@@ -866,8 +894,8 @@ def generate_laptop_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def generate_company_bulk_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
-    budget = float(answers.get("total_budget", 0) or 0)
-    quantity = int(answers.get("quantity", 1) or 1)
+    budget = _safe_float(answers.get("total_budget", 0) or answers.get("budget", 0))
+    quantity = _safe_int(answers.get("quantity", 1))
     product_cat = str(answers.get("product_category", "laptop")).lower()
     perf_req = str(answers.get("performance_requirements", "medium")).lower()
 
@@ -941,7 +969,7 @@ def generate_pet_recommendation(answers: Dict[str, Any], query: str = "") -> Dic
     living = str(answers.get("living_situation", "apartment_large")).lower()
     activity = str(answers.get("activity_level", "medium")).lower()
     time_comm = str(answers.get("time_commitment", "medium")).lower()
-    monthly_budget = float(answers.get("budget", 0) or 0)
+    monthly_budget = _safe_float(answers.get("budget", 0))
     pet_type = answers.get("pet_type", "dog")
 
     if breed_key and breed_key != "recommend" and breed_key in BREED_PROFILES:
@@ -1090,16 +1118,12 @@ def run_decision_engine(category: str, answers: Dict[str, Any], query: str = "")
     alternatives = _generate_alternatives(cat, answers, avg_score)
 
     # Products
-    budget = answers.get("budget") or answers.get("total_budget") or 0
-    try:
-        budget = float(budget)
-    except (TypeError, ValueError):
-        budget = 0
-    quantity = answers.get("quantity", 1) or 1
+    budget = _safe_float(answers.get("budget") or answers.get("total_budget"))
+    quantity = _safe_int(answers.get("quantity", 1))
     products = _generate_product_cards(cat, answers, budget, quantity)
 
     # Quantity
-    qty = answers.get("quantity", 1)
+    qty = quantity
 
     # Follow-up questions for low confidence
     follow_up = []
@@ -1138,7 +1162,7 @@ def _generate_alternatives(category: str, answers: Dict[str, Any], base_score: f
     cat = category.lower()
 
     if cat == "laptop":
-        budget = float(answers.get("budget", 0) or 0)
+        budget = _safe_float(answers.get("budget", 0))
         gaming = str(answers.get("gaming_requirement", "no")).lower() in ["yes", "true", "1"]
         return [
             AlternativeOption(
@@ -1164,8 +1188,8 @@ def _generate_alternatives(category: str, answers: Dict[str, Any], base_score: f
             ),
         ]
     elif cat == "company_bulk":
-        quantity = int(answers.get("quantity", 1) or 1)
-        budget = float(answers.get("total_budget", 0) or 0)
+        quantity = _safe_int(answers.get("quantity", 1))
+        budget = _safe_float(answers.get("total_budget", 0) or answers.get("budget", 0))
         return [
             AlternativeOption(
                 name="Lease/rental model instead of purchase",
@@ -1366,7 +1390,7 @@ def _compute_product_match(product: Dict[str, Any], answers: Dict[str, Any], cat
     cat = category.lower()
 
     if cat == "laptop":
-        budget = float(answers.get("budget", 0) or 0)
+        budget = _safe_float(answers.get("budget", 0))
         gaming = str(answers.get("gaming_requirement", "no")).lower() in ["yes", "true", "1"]
         ai_ml = str(answers.get("ai_ml_requirement", "no")).lower() in ["yes", "true", "1"]
         portability = str(answers.get("portability", "medium")).lower()
@@ -1404,7 +1428,7 @@ def _generate_why_match(product: Dict[str, Any], answers: Dict[str, Any], catego
     else:
         reasons.append("Partial match — consider alternatives")
 
-    budget = float(answers.get("budget", 0) or 0)
+    budget = _safe_float(answers.get("budget", 0))
     price = product.get("price_num", 0)
     if budget > 0 and price > 0 and price <= budget:
         reasons.append("fits within your budget")

@@ -14,23 +14,30 @@ def create_history_entry(
     user_query: Optional[str],
     input_data: dict,
     result: DecisionResult,
-) -> DecisionHistory:
-    """Create and persist a new decision history entry."""
-    entry = DecisionHistory(
-        category=category,
-        user_query=user_query,
-        recommendation=result.recommendation[:490] if result.recommendation else None,
-        confidence=result.confidence,
-        confidence_band=result.confidence_band,
-    )
-    entry.set_input_data(input_data)
-    entry.set_factors([f.model_dump() for f in result.factors])
-    entry.set_result(result.model_dump())
+) -> Optional[DecisionHistory]:
+    """Create and persist a new decision history entry safely."""
+    try:
+        entry = DecisionHistory(
+            category=category,
+            user_query=user_query,
+            recommendation=result.recommendation[:490] if result.recommendation else None,
+            confidence=result.confidence,
+            confidence_band=result.confidence_band,
+        )
+        entry.set_input_data(input_data)
+        entry.set_factors([f.model_dump() for f in result.factors])
+        entry.set_result(result.model_dump())
 
-    db.add(entry)
-    db.commit()
-    db.refresh(entry)
-    return entry
+        db.add(entry)
+        db.commit()
+        db.refresh(entry)
+        return entry
+    except Exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        return None
 
 
 def get_all_history(db: Session, limit: int = 50) -> List[HistoryItem]:

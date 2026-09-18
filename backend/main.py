@@ -40,10 +40,20 @@ app.add_middleware(
 )
 
 
+# Auto-create database tables
+try:
+    init_db()
+except Exception:
+    pass
+
+
 @app.on_event("startup")
 def startup_event():
     """Auto-create database tables on first startup."""
-    init_db()
+    try:
+        init_db()
+    except Exception:
+        pass
 
 
 # ─── Health ───────────────────────────────────────────────────────────────────
@@ -95,7 +105,8 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
             result=result,
         )
 
-        return AnalyzeResponse(success=True, result=result, history_id=entry.id)
+        history_id = entry.id if entry else None
+        return AnalyzeResponse(success=True, result=result, history_id=history_id)
 
     except Exception as e:
         traceback.print_exc()
@@ -136,15 +147,21 @@ def guided_analyze(req: GuidedAnalyzeRequest, db: Session = Depends(get_db)):
         if result is None:
             result = run_decision_engine(req.category, answers)
 
-        entry = create_history_entry(
-            db=db,
-            category=req.category,
-            user_query=f"Guided: {req.category.replace('_', ' ').title()}",
-            input_data=answers,
-            result=result,
-        )
+        history_id = None
+        try:
+            entry = create_history_entry(
+                db=db,
+                category=req.category,
+                user_query=f"Guided: {req.category.replace('_', ' ').title()}",
+                input_data=answers,
+                result=result,
+            )
+            if entry:
+                history_id = entry.id
+        except Exception:
+            pass
 
-        return AnalyzeResponse(success=True, result=result, history_id=entry.id)
+        return AnalyzeResponse(success=True, result=result, history_id=history_id)
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))

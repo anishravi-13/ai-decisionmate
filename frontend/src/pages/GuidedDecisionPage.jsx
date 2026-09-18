@@ -178,7 +178,16 @@ export default function GuidedDecisionPage() {
         }
       })
     } catch (e) {
-      const msg = e.response?.data?.detail || 'Analysis failed. Please check your inputs and try again.'
+      let msg = 'Analysis failed. Please check your inputs and try again.'
+      if (e.response?.data?.detail) {
+        if (typeof e.response.data.detail === 'string') {
+          msg = e.response.data.detail
+        } else if (Array.isArray(e.response.data.detail)) {
+          msg = e.response.data.detail.map(d => d.msg || JSON.stringify(d)).join('; ')
+        }
+      } else if (e.message) {
+        msg = `Connection error (${e.message}). Please ensure the server is active on port 7000.`
+      }
       setError(msg)
     } finally {
       setLoading(false)
