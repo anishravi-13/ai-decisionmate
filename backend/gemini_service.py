@@ -1,15 +1,15 @@
-"""
-gemini_service.py – Integration with Google Gemini API for arbitrary real-world queries.
-Produces structured Explainable Decision Support System (EDSS) outputs matching DecisionResult schema.
+﻿"""
+gemini_service.py – Full Google Gemini Generative AI Integration for AI DecisionMate.
+Powers both Free-Text ("Ask AI") and Guided Questionnaires with ultra-clear explainable analytics.
 """
 import os
 import json
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import httpx
 
 from config import settings
-from schemas import DecisionResult, FactorScore, ImpactAnalysis, AlternativeOption
+from schemas import DecisionResult, FactorScore, ImpactAnalysis, AlternativeOption, ProductCard
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ GEMINI_MODELS = [
 ]
 
 def get_active_gemini_key(user_key: Optional[str] = None) -> Optional[str]:
-    """Retrieve Gemini API key from user parameter, settings, or environment."""
+    """Retrieve Gemini API key from parameter, settings, or environment."""
     if user_key and user_key.strip():
         return user_key.strip()
     if settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip():
@@ -33,88 +33,20 @@ def get_active_gemini_key(user_key: Optional[str] = None) -> Optional[str]:
     return None
 
 
-SYSTEM_PROMPT = """You are AI DecisionMate, a world-class Explainable AI Decision Support System (EDSS).
-Your mission is to help users make high-stakes, everyday, ethical, financial, relational, technical, or personal decisions.
+SYSTEM_PROMPT = """You are AI DecisionMate, an advanced Explainable AI Decision Support System (EDSS).
+Your goal is to guide users to make high-confidence, real-world decisions by providing crystal-clear, structured analytics.
 
-Unlike ordinary chat bots that produce unstructured text essays, you provide structured, auditable, explainable decision analytics:
-1. A direct, clear, highly practical, empathetic, and actionable primary recommendation tailored to their situation.
-2. 4 to 5 quantifiable factor scores (0-100) reflecting the critical dimensions of the decision (e.g. Feasibility, Long-Term Well-Being, Cost/Resource Efficiency, Risk Mitigation, Alignment).
-3. A calibrated confidence score (0-100) and confidence band (HIGH / MEDIUM / LOW) explaining data sufficiency.
-4. An explainability rationale justifying the factor weights and recommendations.
-5. A comprehensive 6-dimension impact analysis:
-   - immediate: short-term outcomes / actions
-   - cost_impact: financial, emotional, or time costs
-   - long_term: 1 to 2 year trajectory
-   - trade_offs: compromises and sacrifices required
-   - risks: downsides or vulnerabilities to watch
-   - maintenance: ongoing habits, reviews, or upkeep
-6. 2 to 3 distinct, realistic alternative paths with scores and trade-offs.
-7. 3 smart follow-up clarifying questions.
+COMMUNICATION PRINCIPLES:
+1. MAXIMUM CLARITY: Speak in plain, warm, and highly actionable English. Explain technical or complex ideas so any beginner immediately understands them.
+2. CONCRETE SPECIFICS: Never give generic advice. Provide exact model recommendations, concrete steps, dietary rules, scripts for conversations, or financial benchmarks.
+3. EXPLAINABILITY: Every factor score (0-100) must have a clear 1-2 sentence description explaining what it means and why this score was assigned.
+4. ACTIONABLE IMPACT: Provide immediate next steps (what to do right now), honest trade-offs, financial/time costs, and long-term trajectory.
 
-Return ONLY a valid JSON object matching the requested schema. No markdown backticks, no preamble, only pure JSON.
+Always return ONLY a valid JSON object matching the requested schema. No markdown formatting around the outer output, no conversational preambles.
 """
 
-def analyze_with_gemini(
-    query: str,
-    api_key: Optional[str] = None,
-    location: Optional[str] = None,
-) -> Optional[DecisionResult]:
-    """
-    Call Google Gemini REST API to analyze any free-text decision.
-    Returns DecisionResult if successful, or None if unavailable/error.
-    """
-    key = get_active_gemini_key(api_key)
-    if not key:
-        logger.info("No Gemini API key found. Falling back to local decision engine.")
-        return None
-
-    prompt = f"""Analyze this decision query thoroughly:
-User Question: "{query}"
-User Location: "{location or 'Not specified'}"
-
-Generate the complete Explainable Decision Support System output as JSON with this exact structure:
-{{
-  "category": "Descriptive category name (e.g. Life & Personal, Career & Education, Health & Nutrition, Tech & Gadgets, Finance, Relationship)",
-  "recommendation": "A detailed, direct, practical, and empathetic primary recommendation with specific actionable steps.",
-  "confidence": 90.0,
-  "confidence_band": "HIGH",
-  "confidence_explanation": "Why this confidence level was assigned based on clarity of user input.",
-  "factors": [
-    {{
-      "factor": "snake_case_key",
-      "score": 88.0,
-      "label": "Human Readable Factor Label",
-      "description": "Explanation of how this factor influences the decision"
-    }}
-  ],
-  "explanation": "A structured 2-3 paragraph explanation justifying the decision logic, factor weights, and trade-offs.",
-  "impact": {{
-    "immediate": ["Immediate outcome 1", "Immediate outcome 2"],
-    "cost_impact": ["Cost/Resource impact 1"],
-    "long_term": ["Long term impact 1", "Long term impact 2"],
-    "trade_offs": ["Trade off 1", "Trade off 2"],
-    "risks": ["Potential risk 1", "Potential risk 2"],
-    "maintenance": ["Ongoing habit or review 1"]
-  }},
-  "alternatives": [
-    {{
-      "name": "Alternative Option Name",
-      "score": 82.0,
-      "key_advantage": "Main advantage over primary recommendation",
-      "key_tradeoff": "Main drawback or trade-off",
-      "estimated_price": "Cost or effort estimate"
-    }}
-  ],
-  "follow_up_questions": [
-    "Clarifying question 1",
-    "Clarifying question 2",
-    "Clarifying question 3"
-  ],
-  "nearby_available": false,
-  "nearby_message": null
-}}
-"""
-
+def _call_gemini_json(prompt: str, key: str) -> Optional[Dict[str, Any]]:
+    """Helper to query Gemini models with automatic fallback across supported versions."""
     payload = {
         "contents": [
             {
@@ -124,12 +56,11 @@ Generate the complete Explainable Decision Support System output as JSON with th
         ],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.35,
+            "temperature": 0.3,
             "maxOutputTokens": 2048,
         }
     }
 
-    # Try model endpoints in order
     for model in GEMINI_MODELS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}"
         try:
@@ -142,93 +73,250 @@ Generate the complete Explainable Decision Support System output as JSON with th
                         parts = candidates[0].get("content", {}).get("parts", [])
                         if parts:
                             raw_text = parts[0].get("text", "")
-                            return _parse_gemini_json(raw_text, query)
+                            cleaned = raw_text.strip()
+                            if cleaned.startswith("```json"):
+                                cleaned = cleaned[7:]
+                            elif cleaned.startswith("```"):
+                                cleaned = cleaned[3:]
+                            if cleaned.endswith("```"):
+                                cleaned = cleaned[:-3]
+                            return json.loads(cleaned.strip())
                 else:
-                    logger.warning(f"Gemini model {model} returned status {res.status_code}: {res.text[:200]}")
+                    logger.warning(f"Gemini model {model} returned HTTP {res.status_code}: {res.text[:150]}")
         except Exception as e:
-            logger.warning(f"Failed to query Gemini model {model}: {e}")
+            logger.warning(f"Gemini model {model} attempt failed: {e}")
 
-    logger.warning("All Gemini model attempts failed or timed out. Falling back to local decision engine.")
     return None
 
 
-def _parse_gemini_json(raw_text: str, original_query: str) -> Optional[DecisionResult]:
-    """Clean and parse JSON from Gemini into a valid DecisionResult."""
-    try:
-        cleaned = raw_text.strip()
-        if cleaned.startswith("```json"):
-            cleaned = cleaned[7:]
-        elif cleaned.startswith("```"):
-            cleaned = cleaned[3:]
-        if cleaned.endswith("```"):
-            cleaned = cleaned[:-3]
-        cleaned = cleaned.strip()
-
-        data = json.loads(cleaned)
-
-        # Parse factors
-        factors = []
-        for f in data.get("factors", []):
-            factors.append(FactorScore(
-                factor=str(f.get("factor", "factor_score")),
-                score=float(f.get("score", 75.0)),
-                label=str(f.get("label", "Evaluation Factor")),
-                description=str(f.get("description", "")),
-            ))
-
-        if not factors:
-            factors = [
-                FactorScore(factor="alignment", score=85.0, label="Requirement Alignment", description="Fit with your core goal"),
-                FactorScore(factor="feasibility", score=80.0, label="Feasibility", description="Ease of implementation"),
-                FactorScore(factor="risk_control", score=82.0, label="Risk Control", description="Safety and risk mitigation"),
-            ]
-
-        # Parse alternatives
-        alternatives = []
-        for a in data.get("alternatives", []):
-            alternatives.append(AlternativeOption(
-                name=str(a.get("name", "Alternative Option")),
-                score=float(a.get("score", 70.0)),
-                key_advantage=str(a.get("key_advantage", "Viable secondary approach")),
-                key_tradeoff=str(a.get("key_tradeoff", "Different trade-off balance")),
-                estimated_price=a.get("estimated_price"),
-            ))
-
-        # Parse impact
-        raw_impact = data.get("impact", {})
-        impact = ImpactAnalysis(
-            immediate=list(raw_impact.get("immediate", ["Clarifies next immediate actionable step."])),
-            cost_impact=list(raw_impact.get("cost_impact", ["Requires dedicated focus and time commitment."])),
-            long_term=list(raw_impact.get("long_term", ["Builds long-term resilience and positive outcome."])),
-            trade_offs=list(raw_impact.get("trade_offs", ["Requires prioritizing this path over alternatives."])),
-            risks=list(raw_impact.get("risks", ["Inconsistency or premature abandonment of the plan."])),
-            maintenance=list(raw_impact.get("maintenance", ["Review progress weekly and adjust as needed."])),
-        )
-
-        conf_score = float(data.get("confidence", 88.0))
-        conf_band = str(data.get("confidence_band", "HIGH" if conf_score >= 80 else "MEDIUM")).upper()
-
-        return DecisionResult(
-            recommendation=str(data.get("recommendation", "Consider your options carefully.")),
-            confidence=conf_score,
-            confidence_band=conf_band,
-            confidence_explanation=str(data.get("confidence_explanation", "Analyzed with Gemini Explainable AI based on your query requirements.")),
-            factors=factors,
-            explanation=str(data.get("explanation", "This recommendation was synthesized using multi-criteria factor analysis.")),
-            impact=impact,
-            alternatives=alternatives,
-            products=[],
-            nearby_available=bool(data.get("nearby_available", False)),
-            nearby_message=data.get("nearby_message"),
-            category=str(data.get("category", "General Decision")),
-            quantity=None,
-            bulk_summary=None,
-            follow_up_questions=list(data.get("follow_up_questions", [
-                "What is your primary constraint (time, budget, or emotion)?",
-                "What would be your ideal outcome in 6 months?",
-                "Do you have a backup plan if initial steps encounter resistance?"
-            ])),
-        )
-    except Exception as e:
-        logger.error(f"Failed to parse Gemini output into DecisionResult: {e}. Raw text: {raw_text[:300]}")
+def analyze_with_gemini(
+    query: str,
+    api_key: Optional[str] = None,
+    location: Optional[str] = None,
+) -> Optional[DecisionResult]:
+    """Analyze open-ended free text questions with Gemini AI."""
+    key = get_active_gemini_key(api_key)
+    if not key:
         return None
+
+    prompt = f"""User Decision Query: "{query}"
+User Location: "{location or 'Not specified'}"
+
+Please synthesize the definitive Explainable Decision Support System (EDSS) guidance for this query.
+Make the recommendation exceptionally clear, practical, structured, and easy for the user to understand.
+
+Output JSON with this schema:
+{{
+  "category": "Clear category (e.g. Career & Education, Health & Nutrition, Relationships, Tech, Finance, Life Decision)",
+  "recommendation": "Direct, empathetic, and actionable recommendation with specific next steps.",
+  "confidence": 92.0,
+  "confidence_band": "HIGH",
+  "confidence_explanation": "Plain English rationale of why this confidence level was assigned.",
+  "factors": [
+    {{
+      "factor": "snake_case_key",
+      "score": 90.0,
+      "label": "Easy to Understand Factor Label",
+      "description": "Clear 1-2 sentence explanation of what this measures and why this score was awarded."
+    }}
+  ],
+  "explanation": "A structured 2-3 paragraph plain-English explanation breaking down the rationale and trade-offs.",
+  "impact": {{
+    "immediate": ["Specific action for today", "Second immediate step"],
+    "cost_impact": ["Clear estimate of financial, time, or emotional cost"],
+    "long_term": ["Expected outcome 6-18 months out"],
+    "trade_offs": ["What is sacrificed or compromised with this choice"],
+    "risks": ["Key vulnerabilities to watch and mitigate"],
+    "maintenance": ["Ongoing habit or review frequency needed"]
+  }},
+  "alternatives": [
+    {{
+      "name": "Alternative Option Name",
+      "score": 75.0,
+      "key_advantage": "Main advantage",
+      "key_tradeoff": "Main trade-off",
+      "estimated_price": "Cost or effort"
+    }}
+  ],
+  "follow_up_questions": [
+    "Clarifying question 1",
+    "Clarifying question 2",
+    "Clarifying question 3"
+  ],
+  "nearby_available": false,
+  "nearby_message": null
+}}
+"""
+    data = _call_gemini_json(prompt, key)
+    if not data:
+        return None
+
+    return _build_decision_result(data, query, "general")
+
+
+def analyze_guided_with_gemini(
+    category: str,
+    answers: Dict[str, Any],
+    location: Optional[str] = None,
+) -> Optional[DecisionResult]:
+    """Analyze structured guided questionnaire answers with Gemini AI."""
+    key = get_active_gemini_key()
+    if not key:
+        return None
+
+    cat_title = category.replace("_", " ").title()
+
+    # Format user questionnaire answers cleanly
+    formatted_answers = []
+    for k, v in answers.items():
+        if k in ["query", "location"]:
+            continue
+        if v is not None and v != "" and v != []:
+            label = k.replace("_", " ").title()
+            if isinstance(v, list):
+                val_str = ", ".join(str(item).replace("_", " ").title() for item in v)
+            elif isinstance(v, (int, float)) and "budget" in k.lower():
+                val_str = f"₹{v:,.0f}"
+            else:
+                val_str = str(v).replace("_", " ").title()
+            formatted_answers.append(f"- {label}: {val_str}")
+
+    answers_text = "\n".join(formatted_answers) if formatted_answers else "Standard defaults"
+
+    prompt = f"""The user completed the Guided Decision Questionnaire for category: '{cat_title}'.
+Their specific requirements and constraints:
+{answers_text}
+User Location: "{location or 'Not specified'}"
+
+Synthesize the ultimate Explainable Decision Support System (EDSS) recommendation for this user.
+Write in crystal-clear, friendly, and authoritative English.
+For physical products (e.g. Laptop, Phone, Aquarium, Office Gear), name exact models/specs matching their budget.
+For life/pets/health/career decisions, provide exact action plans and clear factor explanations.
+
+Output JSON with this schema:
+{{
+  "category": "{cat_title}",
+  "recommendation": "Direct, highly specific primary recommendation naming exact models/protocols/actions.",
+  "confidence": 94.0,
+  "confidence_band": "HIGH",
+  "confidence_explanation": "Explanation of data alignment with user constraints.",
+  "factors": [
+    {{
+      "factor": "snake_case_key",
+      "score": 92.0,
+      "label": "Clear Factor Label",
+      "description": "Clear 1-2 sentence description explaining the score for this specific requirement."
+    }}
+  ],
+  "explanation": "2-3 paragraphs of structured rationale explaining why this option best satisfies their questionnaire answers.",
+  "impact": {{
+    "immediate": ["Immediate step 1", "Immediate step 2"],
+    "cost_impact": ["Cost/budget alignment analysis"],
+    "long_term": ["Long-term value and lifespan"],
+    "trade_offs": ["Key compromise made compared to alternatives"],
+    "risks": ["Potential pitfalls to avoid"],
+    "maintenance": ["Ongoing maintenance or upkeep required"]
+  }},
+  "alternatives": [
+    {{
+      "name": "Alternative Option Name",
+      "score": 80.0,
+      "key_advantage": "Main advantage",
+      "key_tradeoff": "Key compromise",
+      "estimated_price": "Price or effort"
+    }}
+  ],
+  "follow_up_questions": [
+    "Clarifying question 1",
+    "Clarifying question 2",
+    "Clarifying question 3"
+  ],
+  "nearby_available": {str(category in ["laptop", "smartphone", "pet", "fish_aquarium", "office_equipment", "health"]).lower()},
+  "nearby_message": "Local stores and clinics are available for physical testing and consultation."
+}}
+"""
+    data = _call_gemini_json(prompt, key)
+    if not data:
+        return None
+
+    result = _build_decision_result(data, f"Guided {cat_title}", category)
+    result.category = category
+
+    # Attach demo catalog products where relevant
+    try:
+        from product_catalog import get_products_for_category
+        budget_val = float(answers.get("budget", 0) or answers.get("total_budget", 0) or 0)
+        quantity_val = int(answers.get("quantity", 1) or 1)
+        from decision_engine import _generate_product_cards
+        cards = _generate_product_cards(category, answers, budget_val, quantity_val)
+        if cards:
+            result.products = cards
+    except Exception:
+        pass
+
+    return result
+
+
+def _build_decision_result(data: Dict[str, Any], query_context: str, fallback_cat: str) -> DecisionResult:
+    """Build a validated DecisionResult object from parsed Gemini JSON."""
+    factors = []
+    for f in data.get("factors", []):
+        factors.append(FactorScore(
+            factor=str(f.get("factor", "factor_score")),
+            score=float(f.get("score", 80.0)),
+            label=str(f.get("label", "Decision Factor")),
+            description=str(f.get("description", "Evaluation metric")),
+        ))
+
+    if not factors:
+        factors = [
+            FactorScore(factor="requirement_fit", score=90.0, label="Requirement Match", description="How thoroughly this meets your stated criteria"),
+            FactorScore(factor="practical_feasibility", score=85.0, label="Practical Feasibility", description="Ease and realism of execution"),
+            FactorScore(factor="risk_mitigation", score=88.0, label="Risk Management", description="Protection against downsides and regrets"),
+            FactorScore(factor="long_term_value", score=86.0, label="Long-Term Value", description="Durability of this choice over time"),
+        ]
+
+    alternatives = []
+    for a in data.get("alternatives", []):
+        alternatives.append(AlternativeOption(
+            name=str(a.get("name", "Alternative Option")),
+            score=float(a.get("score", 75.0)),
+            key_advantage=str(a.get("key_advantage", "Viable alternative choice")),
+            key_tradeoff=str(a.get("key_tradeoff", "Different trade-off profile")),
+            estimated_price=a.get("estimated_price"),
+        ))
+
+    raw_impact = data.get("impact", {})
+    impact = ImpactAnalysis(
+        immediate=list(raw_impact.get("immediate", ["Immediate step defined."])),
+        cost_impact=list(raw_impact.get("cost_impact", ["Cost evaluated."])),
+        long_term=list(raw_impact.get("long_term", ["Long-term value evaluated."])),
+        trade_offs=list(raw_impact.get("trade_offs", ["Trade-offs balanced."])),
+        risks=list(raw_impact.get("risks", ["Risks identified."])),
+        maintenance=list(raw_impact.get("maintenance", ["Upkeep noted."])),
+    )
+
+    conf_score = float(data.get("confidence", 90.0))
+    conf_band = str(data.get("confidence_band", "HIGH" if conf_score >= 80 else "MEDIUM")).upper()
+
+    return DecisionResult(
+        recommendation=str(data.get("recommendation", "Proceed with a structured approach.")),
+        confidence=conf_score,
+        confidence_band=conf_band,
+        confidence_explanation=str(data.get("confidence_explanation", "Analyzed using Gemini AI factor evaluation.")),
+        factors=factors,
+        explanation=str(data.get("explanation", "Synthesized using multi-criteria factor analysis.")),
+        impact=impact,
+        alternatives=alternatives,
+        products=[],
+        nearby_available=bool(data.get("nearby_available", False)),
+        nearby_message=data.get("nearby_message"),
+        category=str(data.get("category", fallback_cat)),
+        quantity=None,
+        bulk_summary=None,
+        follow_up_questions=list(data.get("follow_up_questions", [
+            "What is your highest priority constraint?",
+            "What is your timeline for implementation?",
+            "What is your backup plan if circumstances change?"
+        ])),
+    )

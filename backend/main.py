@@ -109,7 +109,7 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
 
 @app.post("/guided-analyze", response_model=AnalyzeResponse, tags=["Decision"])
 def guided_analyze(req: GuidedAnalyzeRequest, db: Session = Depends(get_db)):
-    """Analyze a guided questionnaire-based decision."""
+    """Analyze a guided questionnaire-based decision using Gemini AI with local fallback."""
     try:
         from decision_engine import run_decision_engine
         from history import create_history_entry
@@ -120,12 +120,26 @@ def guided_analyze(req: GuidedAnalyzeRequest, db: Session = Depends(get_db)):
         if req.location:
             answers["location"] = req.location
 
-        result = run_decision_engine(req.category, answers)
+        # 1. Attempt Gemini Generative AI for guided decisions
+        result = None
+        try:
+            from gemini_service import analyze_guided_with_gemini
+            result = analyze_guided_with_gemini(
+                category=req.category,
+                answers=answers,
+                location=req.location,
+            )
+        except Exception as e:
+            traceback.print_exc()
+
+        # 2. Fall back to local rule-based engine if Gemini unavailable
+        if result is None:
+            result = run_decision_engine(req.category, answers)
 
         entry = create_history_entry(
             db=db,
             category=req.category,
-            user_query=f"Guided: {req.category}",
+            user_query=f"Guided: {req.category.replace('_', ' ').title()}",
             input_data=answers,
             result=result,
         )
