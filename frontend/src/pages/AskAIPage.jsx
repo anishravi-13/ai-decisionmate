@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Brain, Send, Lightbulb, AlertCircle, Sparkles } from 'lucide-react'
+import { Brain, Send, Lightbulb, AlertCircle } from 'lucide-react'
 import { analyzeDecision } from '../api'
 import LoadingSpinner from '../components/LoadingSpinner'
 import ErrorBanner from '../components/ErrorBanner'
@@ -63,11 +63,8 @@ export default function AskAIPage() {
           <Brain className="w-5 h-5 text-amber-400" />
         </div>
         <div>
-          <h1 className="font-heading text-2xl font-bold text-charcoal-100 flex items-center gap-2">
+          <h1 className="font-heading text-2xl font-bold text-charcoal-100">
             Ask AI
-            <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-              <Sparkles className="w-3.5 h-3.5" /> Powered by Gemini AI
-            </span>
           </h1>
           <p className="text-charcoal-400 text-sm">Ask literally ANY question, decision, or dilemma — get structured, explainable guidance</p>
         </div>
