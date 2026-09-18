@@ -7,6 +7,7 @@ class Settings:
     CORS_ORIGINS: List[str] = ["*"]
     GOOGLE_MAPS_API_KEY: Optional[str] = os.getenv("GOOGLE_MAPS_API_KEY")
     SERP_API_KEY: Optional[str] = os.getenv("SERP_API_KEY")
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
     DEBUG: bool = True
 
 

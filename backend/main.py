@@ -59,6 +59,18 @@ def health_check(db: Session = Depends(get_db)):
     return HealthResponse(status="ok", version="1.0.0", database=db_status)
 
 
+@app.get("/gemini-status", tags=["System"])
+def gemini_status():
+    """Check if Gemini API key is configured on server."""
+    from config import settings
+    has_key = bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip())
+    return {
+        "server_configured": has_key,
+        "models": ["gemini-1.5-flash", "gemini-2.0-flash"],
+        "status": "ready" if has_key else "needs_key_or_client_key",
+    }
+
+
 # ─── Analyze (Free-text) ──────────────────────────────────────────────────────
 
 @app.post("/analyze", response_model=AnalyzeResponse, tags=["Decision"])
@@ -68,7 +80,11 @@ def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
         from decision_engine import analyze_free_text
         from history import create_history_entry
 
-        result = analyze_free_text(req.query)
+        result = analyze_free_text(
+            query=req.query,
+            api_key=req.api_key,
+            location=req.location,
+        )
 
         # Persist to history
         entry = create_history_entry(

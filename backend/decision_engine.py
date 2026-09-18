@@ -1008,6 +1008,9 @@ def generate_health_recommendation(answers: Dict[str, Any], query: str = "") -> 
 
 
 def generate_general_recommendation(category: str, answers: Dict[str, Any], query: str = "") -> Dict[str, Any]:
+    q = (query or answers.get("query", "")).strip()
+    q_lower = q.lower()
+
     recs = {
         "fish_aquarium": "Start with a 40–75 litre freshwater tank with beginner-friendly fish such as Neon Tetras or Guppies",
         "education": "Evaluate course accreditation, placement record, and skill alignment with your career goal before enrolling.",
@@ -1016,9 +1019,29 @@ def generate_general_recommendation(category: str, answers: Dict[str, Any], quer
         "home": "Evaluate total cost of ownership (purchase + installation + maintenance) and energy efficiency ratings.",
         "vehicle": "Compare EMI affordability, fuel/running cost, insurance, and resale value. Test-drive before deciding.",
         "personal": "Prioritize emotional self-regulation, respect clear personal boundaries, and build a balanced support circle.",
-        "general": "Based on your stated requirements, evaluate options systematically against your primary criteria.",
     }
-    rec = recs.get(category, f"Based on your requirements, a careful evaluation across the key decision factors is recommended.")
+
+    if category in recs:
+        rec = recs[category]
+    elif any(k in q_lower for k in ["job", "career", "interview", "resume", "resign", "promotion", "switch"]):
+        rec = f"Career Strategy: 1) Verify your 6-month financial runway, 2) Identify the top 3 hard skills required in current job listings, and 3) Conduct 2–3 informational interviews with practitioners in the target field before committing to an irreversible career move."
+    elif any(k in q_lower for k in ["invest", "money", "save", "crypto", "stock", "mutual fund", "loan", "debt", "emi", "finance"]):
+        rec = f"Financial Strategy: 1) Clear any high-interest debt (>12% APR) immediately, 2) Build a 3–6 month emergency fund in liquid accounts, and 3) Diversify core investments in low-cost broad index funds rather than speculative single assets."
+    elif any(k in q_lower for k in ["study", "college", "university", "degree", "course", "exam", "learn"]):
+        rec = f"Education & Skill Strategy: Evaluate the learning pathway by 3 measurable criteria: curriculum relevance to emerging industry workflows, practical hands-on portfolio projects, and verified alumni career placement."
+    elif any(k in q_lower for k in ["buy or rent", "rent or buy", "flat", "apartment", "property", "house"]):
+        rec = "Housing Decision Framework: Compare total unrecoverable monthly costs (interest + taxes + maintenance) against your current rent. If your time horizon in this city is under 5 years, renting and investing the down payment surplus provides superior liquidity and returns."
+    elif any(k in q_lower for k in ["gym", "workout", "weight loss", "diet", "fitness", "muscle", "health"]):
+        rec = "Health & Fitness Strategy: Prioritize habit consistency over extreme routines. Begin with 3 targeted weekly sessions, consume 1.4–1.8g protein per kg of bodyweight, aim for 7–8 hours of quality sleep, and monitor progress over 4-week cycles."
+    elif any(k in q_lower for k in ["should i", "what should i do", "how to decide", "dilemma", "advice"]):
+        clean_q = q[:100] + "..." if len(q) > 100 else q
+        rec = f"Strategic Decision for '{clean_q}': Define your non-negotiable success criteria, map out the worst-case scenario to ensure downside risk is survivable, and run a reversible 14-day micro-experiment before executing a permanent commitment."
+    elif q:
+        clean_q = q[:100] + "..." if len(q) > 100 else q
+        rec = f"Tailored Decision Path for '{clean_q}': Prioritize the option that preserves long-term optionality, minimizes unhedged risks, and delivers the highest tangible return on your time and effort."
+    else:
+        rec = "Based on your stated requirements, evaluate options systematically against your primary criteria."
+
     return {"recommendation": rec, "category": category}
 
 
@@ -1449,8 +1472,22 @@ def _generate_follow_up_questions(category: str, answers: Dict[str, Any]) -> Lis
     return questions_map.get(category, questions_map["general"])[:3]
 
 
-def analyze_free_text(query: str) -> DecisionResult:
-    """Parse free text and run decision engine."""
+def analyze_free_text(
+    query: str,
+    api_key: Optional[str] = None,
+    location: Optional[str] = None,
+) -> DecisionResult:
+    """Parse free text and run decision engine, with Gemini Generative AI priority."""
+    # 1. Attempt Gemini Generative AI first if key is available
+    try:
+        from gemini_service import analyze_with_gemini
+        gemini_result = analyze_with_gemini(query=query, api_key=api_key, location=location)
+        if gemini_result is not None:
+            return gemini_result
+    except Exception as e:
+        logger.warning(f"Gemini analysis error: {e}. Falling back to local engine.")
+
+    # 2. Local rule-based decision engine
     category = detect_category(query)
     budget = extract_budget(query)
     quantity = extract_quantity(query)
@@ -1460,6 +1497,8 @@ def analyze_free_text(query: str) -> DecisionResult:
         "query": query,
         "requirements": requirements,
     }
+    if location:
+        answers["location"] = location
     if budget:
         answers["budget"] = budget
         answers["total_budget"] = budget

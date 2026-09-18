@@ -6,8 +6,9 @@ from datetime import datetime
 # ─── Request Schemas ────────────────────────────────────────────────────────
 
 class AnalyzeRequest(BaseModel):
-    query: str = Field(..., min_length=5, max_length=2000, description="Free-text decision query")
+    query: str = Field(..., min_length=3, max_length=4000, description="Free-text decision query")
     location: Optional[str] = Field(None, max_length=200)
+    api_key: Optional[str] = Field(None, max_length=200, description="Optional Gemini API key from user")
 
     @field_validator("query")
     @classmethod

@@ -15,8 +15,18 @@ const api = axios.create({
 // Health check
 export const checkHealth = () => api.get('/health')
 
+// Gemini AI status
+export const checkGeminiStatus = () => api.get('/gemini-status')
+
 // Analyze free-text input
-export const analyzeDecision = (data) => api.post('/analyze', data)
+export const analyzeDecision = (data) => {
+  const userKey = typeof window !== 'undefined' ? localStorage.getItem('gemini_api_key') : null
+  const payload = { ...data }
+  if (userKey && userKey.trim() && !payload.api_key) {
+    payload.api_key = userKey.trim()
+  }
+  return api.post('/analyze', payload)
+}
 
 // Guided decision
 export const guidedAnalyze = (data) => api.post('/guided-analyze', data)
