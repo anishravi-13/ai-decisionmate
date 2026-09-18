@@ -1,4 +1,4 @@
-﻿"""
+"""
 gemini_service.py – Integration with Google Gemini API for arbitrary real-world queries.
 Produces structured Explainable Decision Support System (EDSS) outputs matching DecisionResult schema.
 """
@@ -14,9 +14,11 @@ from schemas import DecisionResult, FactorScore, ImpactAnalysis, AlternativeOpti
 logger = logging.getLogger(__name__)
 
 GEMINI_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro",
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-pro",
 ]
 
 def get_active_gemini_key(user_key: Optional[str] = None) -> Optional[str]:
