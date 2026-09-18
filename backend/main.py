@@ -422,7 +422,14 @@ def impact_analysis(req: ImpactRequest):
 
     except Exception as e:
         traceback.print_exc()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Impact analysis failed: {str(e)}")
+# ─── Static Frontend (Unified 1-Server Mode) ──────────────────────────────────
+
+import os
+from fastapi.staticfiles import StaticFiles
+
+frontend_dist = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+if os.path.exists(frontend_dist):
+    app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="static")
 
 
 # ─── Run ──────────────────────────────────────────────────────────────────────

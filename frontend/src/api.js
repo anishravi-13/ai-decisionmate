@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const BASE_URL = 'http://localhost:8000'
+const BASE_URL = (typeof window !== 'undefined' && window.location.port === '5173')
+  ? 'http://localhost:8000'
+  : ''
 
 const api = axios.create({
   baseURL: BASE_URL,
