@@ -36,6 +36,13 @@ CATEGORY_KEYWORDS: Dict[str, List[str]] = {
         "personal dilemma", "mental health", "habit", "stress", "routine", "burnout", "work life balance",
         "life decision", "self improvement", "guilt", "anxiety"
     ],
+    "health": [
+        "diarrhea", "diarrhoea", "loose motion", "stomach", "stomach ache", "food poisoning",
+        "vomiting", "vomit", "nausea", "fever", "headache", "cold", "flu", "cough", "indigestion",
+        "what should i eat", "what to eat", "what shoulod i eat", "diet", "nutrition", "dehydration",
+        "ors", "electrolyte", "infection", "medicine", "doctor", "allergy", "cramps", "sick",
+        "illness", "gastroenteritis", "gastric", "acidity", "constipation"
+    ],
 }
 
 
@@ -217,6 +224,50 @@ def extract_pet_entities(text: str) -> Dict[str, Any]:
         entities["activity_level"] = "medium"
     elif any(k in text_lower for k in ["low", "relaxed", "indoor", "lazy", "busy"]):
         entities["activity_level"] = "low"
+
+    return entities
+
+
+def extract_health_entities(text: str) -> Dict[str, Any]:
+    """Extract health condition, symptoms, and dietary intent from free text."""
+    text_lower = text.lower()
+    entities: Dict[str, Any] = {}
+
+    # Condition detection
+    if any(k in text_lower for k in ["diarrhea", "diarrhoea", "loose motion", "watery stool"]):
+        entities["condition"] = "diarrhea"
+    elif any(k in text_lower for k in ["vomit", "vomiting", "nausea"]):
+        entities["condition"] = "nausea_vomiting"
+    elif any(k in text_lower for k in ["fever", "chills", "high temp"]):
+        entities["condition"] = "fever"
+    elif any(k in text_lower for k in ["acidity", "heartburn", "acid reflux"]):
+        entities["condition"] = "acidity"
+    elif any(k in text_lower for k in ["constipation", "bloating"]):
+        entities["condition"] = "constipation"
+    else:
+        entities["condition"] = "stomach_upset"
+
+    # Red flag symptoms detection
+    if any(k in text_lower for k in ["blood", "bloody", "black stool", "faint", "dizziness", "severe pain", "103", "102"]):
+        entities["red_flags"] = "yes"
+    else:
+        entities["red_flags"] = "no"
+
+    # Duration
+    if any(k in text_lower for k in ["just started", "today", "hours"]):
+        entities["duration"] = "under_24h"
+    elif any(k in text_lower for k in ["2 days", "yesterday", "3 days", "few days"]):
+        entities["duration"] = "1_to_3_days"
+    elif any(k in text_lower for k in ["week", "chronic", "long time"]):
+        entities["duration"] = "over_3_days"
+    else:
+        entities["duration"] = "under_24h"
+
+    # Hydration risk
+    if any(k in text_lower for k in ["thirsty", "dry mouth", "weak", "tired", "fatigue", "dizzy"]):
+        entities["dehydration_risk"] = "high"
+    else:
+        entities["dehydration_risk"] = "medium"
 
     return entities
 
@@ -651,6 +702,64 @@ def score_pet(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
     return factors, round(avg)
 
 
+def score_health(answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
+    """Score health recovery, hydration, and nutritional safety factors."""
+    condition = answers.get("condition", "diarrhea")
+    duration = answers.get("duration", "under_24h")
+    dehydration_risk = answers.get("dehydration_risk", "medium")
+    has_red_flags = answers.get("red_flags", "no") == "yes"
+
+    # 1. Hydration & Electrolyte Replacement (Crucial clinical priority)
+    hydration_score = 98 if dehydration_risk == "high" else 92
+
+    # 2. Digestive Rest & Low-Fibre Bland Diet (BRAT)
+    digestive_score = 94
+
+    # 3. Stool-Binding Capability (Pectin, Starches)
+    binding_score = 90 if condition == "diarrhea" else 75
+
+    # 4. Irritant Avoidance (Eliminating milk/dairy, chili, fried, coffee)
+    irritant_score = 92
+
+    # 5. Clinical Safety & Red Flag Screening
+    safety_score = 60 if has_red_flags or duration == "over_3_days" else 90
+
+    factors = [
+        FactorScore(
+            factor="hydration_priority",
+            score=round(hydration_score),
+            label="Hydration & Electrolyte Balance",
+            description="Crucial priority: replacing fluids, potassium, and sodium lost through frequent bowel movements",
+        ),
+        FactorScore(
+            factor="digestive_rest",
+            score=round(digestive_score),
+            label="Digestive Rest & Bland Diet",
+            description="Resting inflamed gut mucosa with easily digestible, low-residue, non-irritating starches",
+        ),
+        FactorScore(
+            factor="stool_binding",
+            score=round(binding_score),
+            label="Stool-Binding Capability",
+            description="Utilizing soluble fibre (pectin from bananas/applesauce) and simple starches to firm stool",
+        ),
+        FactorScore(
+            factor="irritant_avoidance",
+            score=round(irritant_score),
+            label="Irritant Avoidance",
+            description="Strictly eliminating dairy/lactose, greasy fried foods, chili spices, and caffeine that trigger gut spasms",
+        ),
+        FactorScore(
+            factor="medical_safety",
+            score=round(safety_score),
+            label="Clinical Safety & Monitoring",
+            description="Evaluating red flag symptoms that require clinical diagnosis rather than home diet care",
+        ),
+    ]
+    avg = sum(f.score for f in factors) / len(factors)
+    return factors, round(avg)
+
+
 def score_general(category: str, answers: Dict[str, Any]) -> Tuple[List[FactorScore], float]:
     """Generic scoring for any category."""
     budget = answers.get("budget", 0) or 0
@@ -861,6 +970,43 @@ def generate_pet_recommendation(answers: Dict[str, Any], query: str = "") -> Dic
     return {"recommendation": rec, "category": "pet"}
 
 
+def generate_health_recommendation(answers: Dict[str, Any], query: str = "") -> Dict[str, Any]:
+    """Generate clinical nutrition & recovery guidance for acute health symptoms."""
+    condition = answers.get("condition", "diarrhea")
+    has_red_flags = answers.get("red_flags", "no") == "yes"
+    duration = answers.get("duration", "under_24h")
+
+    if has_red_flags or duration == "over_3_days":
+        rec = (
+            "Medical Evaluation Recommended: Please consult a physician promptly. "
+            "For immediate home care: Sip Oral Rehydration Salts (ORS) continuously to avoid dehydration. "
+            "Do NOT take self-prescribed anti-motility drugs (e.g. Loperamide) if fever or severe pain is present."
+        )
+    elif condition == "diarrhea":
+        rec = (
+            "Adopt the BRAT Diet Protocol (Bananas, White Rice, Applesauce, Plain Toast) paired with continuous Oral Rehydration Solution (ORS). "
+            "Take frequent, small sips of coconut water, salted rice congee (kanji), or clear broths. "
+            "Strictly avoid: Milk/dairy, spicy seasonings, oily/fried foods, caffeine, and artificial sweeteners for 3–5 days."
+        )
+    elif condition == "nausea_vomiting":
+        rec = (
+            "Allow the stomach to settle with 1–2 hours of gut rest, then take tiny ice chips or cold electrolyte sips. "
+            "Gradually introduce plain saltine crackers, boiled potato, and ginger tea once fluid is tolerated."
+        )
+    elif condition == "acidity":
+        rec = (
+            "Eat small, non-acidic meals: Oatmeal, ripe bananas, boiled vegetables, and cold milk/almond milk. "
+            "Avoid citrus fruits, tomatoes, fried snacks, coffee, and lying down within 3 hours after eating."
+        )
+    else:
+        rec = (
+            "Follow a gentle restorative diet: Sip warm electrolyte broths, eat small portions of steamed rice or dry toast, "
+            "and rest your digestive system while monitoring symptoms."
+        )
+
+    return {"recommendation": rec, "category": "health"}
+
+
 def generate_general_recommendation(category: str, answers: Dict[str, Any], query: str = "") -> Dict[str, Any]:
     recs = {
         "fish_aquarium": "Start with a 40–75 litre freshwater tank with beginner-friendly fish such as Neon Tetras or Guppies",
@@ -898,6 +1044,9 @@ def run_decision_engine(category: str, answers: Dict[str, Any], query: str = "")
     elif cat == "pet":
         factors, avg_score = score_pet(answers)
         rec_data = generate_pet_recommendation(answers, query)
+    elif cat == "health":
+        factors, avg_score = score_health(answers)
+        rec_data = generate_health_recommendation(answers, query)
     else:
         factors, avg_score = score_general(cat, answers)
         rec_data = generate_general_recommendation(cat, answers, query)
@@ -944,11 +1093,15 @@ def run_decision_engine(category: str, answers: Dict[str, Any], query: str = "")
         impact=impact,
         alternatives=alternatives,
         products=products,
-        nearby_available=cat in ["pet", "fish_aquarium", "laptop", "smartphone", "office_equipment", "relationship", "personal"],
+        nearby_available=cat in ["pet", "fish_aquarium", "laptop", "smartphone", "office_equipment", "relationship", "personal", "health"],
         nearby_message=(
-            "Discover local counseling centers, community support groups, and social meetup clubs."
-            if cat in ["relationship", "personal"]
-            else "Use the 'Find Nearby' feature to discover local shops."
+            "Discover local 24/7 pharmacies, medical clinics, and hospitals."
+            if cat == "health"
+            else (
+                "Discover local counseling centers, community support groups, and social meetup clubs."
+                if cat in ["relationship", "personal"]
+                else "Use the 'Find Nearby' feature to discover local shops."
+            )
         ),
         category=cat,
         quantity=int(qty) if qty else 1,
@@ -1111,6 +1264,30 @@ def _generate_alternatives(category: str, answers: Dict[str, Any], base_score: f
                     estimated_price="Monthly: ~₹1,200",
                 ),
             ]
+    elif cat == "health":
+        return [
+            AlternativeOption(
+                name="BRAT Protocol + ORS Rehydration (Clinical Standard Home Care)",
+                score=round(min(base_score + 5, 96)),
+                key_advantage="Clinically proven to firm stool, replace vital potassium/sodium, and avoid gut irritation",
+                key_tradeoff="Bland taste; limited nutritional diversity during the initial 24–48 hours",
+                estimated_price="Under ₹100 (Bananas, rice, bread, ORS)",
+            ),
+            AlternativeOption(
+                name="Liquid-Only Fasting & Electrolyte Loading (First 6–12 Hours)",
+                score=round(base_score - 2),
+                key_advantage="Provides complete mechanical rest to inflamed intestinal walls",
+                key_tradeoff="Prolonged fasting (>12h) can weaken intestinal enterocytes; solid food should be phased in soon",
+                estimated_price="ORS & coconut water: ~₹50",
+            ),
+            AlternativeOption(
+                name="Immediate Clinical Outpatient Consultation / Stool Test",
+                score=round(max(base_score - 6, 65)),
+                key_advantage="Pinpoints bacterial vs viral etiology; allows targeted prescription if fever or severe cramps develop",
+                key_tradeoff="Requires clinic visit and consultation fee",
+                estimated_price="Clinic consultation: ₹300–₹800",
+            ),
+        ]
     else:
         return [
             AlternativeOption(
@@ -1258,6 +1435,11 @@ def _generate_follow_up_questions(category: str, answers: Dict[str, Any]) -> Lis
             "How much daily time can you dedicate to walking and grooming?",
             "Do you have a specific breed in mind or want a recommendation?",
         ],
+        "health": [
+            "How many days have you been experiencing these digestive symptoms?",
+            "Are you able to keep oral fluids down without vomiting?",
+            "Do you have any high fever (>102°F / 38.9°C), blood in stool, or severe sharp abdominal pain?",
+        ],
         "general": [
             "What is your budget or financial constraint?",
             "What are your top 3 requirements or priorities?",
@@ -1307,5 +1489,10 @@ def analyze_free_text(query: str) -> DecisionResult:
     if category == "pet":
         pet_entities = extract_pet_entities(query)
         answers.update(pet_entities)
+
+    # Extract specific entities for health
+    if category == "health":
+        health_entities = extract_health_entities(query)
+        answers.update(health_entities)
 
     return run_decision_engine(category, answers, query)

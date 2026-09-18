@@ -14,6 +14,7 @@ function useDebounce(value, delay) {
 
 export default function WhatIfPanel({ originalResult, category, originalInput }) {
   const isRelationship = category === 'relationship' || category === 'personal'
+  const isHealth = category === 'health'
 
   // Product / general state
   const [budget, setBudget] = useState(originalInput?.budget || 50000)
@@ -25,6 +26,12 @@ export default function WhatIfPanel({ originalResult, category, originalInput })
   const [conflictIntensity, setConflictIntensity] = useState(originalInput?.conflict_intensity || 'high')
   const [faultAttribution, setFaultAttribution] = useState(originalInput?.fault_attribution || 'mutual_or_unclear')
   const [askedForSpace, setAskedForSpace] = useState(originalInput?.asked_for_space || 'yes')
+
+  // Health specific state
+  const [healthCondition, setHealthCondition] = useState(originalInput?.condition || 'diarrhea')
+  const [healthDuration, setHealthDuration] = useState(originalInput?.duration || 'under_24h')
+  const [healthRedFlags, setHealthRedFlags] = useState(originalInput?.red_flags || 'no')
+  const [dehydrationRisk, setDehydrationRisk] = useState(originalInput?.dehydration_risk || 'medium')
 
   const [result, setResult] = useState(null)
   const [changed, setChanged] = useState(false)
@@ -41,12 +48,25 @@ export default function WhatIfPanel({ originalResult, category, originalInput })
   const debouncedFault = useDebounce(faultAttribution, 350)
   const debouncedSpace = useDebounce(askedForSpace, 350)
 
+  const debouncedCondition = useDebounce(healthCondition, 300)
+  const debouncedDuration = useDebounce(healthDuration, 300)
+  const debouncedRedFlags = useDebounce(healthRedFlags, 300)
+  const debouncedDehydration = useDebounce(dehydrationRisk, 300)
+
   const runWhatIf = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       let changes = {}
-      if (isRelationship) {
+      if (isHealth) {
+        changes = {
+          condition: debouncedCondition,
+          duration: debouncedDuration,
+          red_flags: debouncedRedFlags,
+          dehydration_risk: debouncedDehydration,
+          recommendation: originalResult?.recommendation,
+        }
+      } else if (isRelationship) {
         changes = {
           cooling_off_days: debouncedCooling,
           conflict_intensity: debouncedConflict,
@@ -77,6 +97,11 @@ export default function WhatIfPanel({ originalResult, category, originalInput })
       setLoading(false)
     }
   }, [
+    isHealth,
+    debouncedCondition,
+    debouncedDuration,
+    debouncedRedFlags,
+    debouncedDehydration,
     isRelationship,
     debouncedCooling,
     debouncedConflict,
@@ -104,13 +129,119 @@ export default function WhatIfPanel({ originalResult, category, originalInput })
       <div className="flex items-center gap-2 mb-1">
         <SlidersHorizontal className="w-4 h-4 text-amber-400" />
         <p className="text-xs text-charcoal-400">
-          {isRelationship
+          {isHealth
+            ? 'Simulate symptom duration, red-flag warnings, and dehydration levels to test clinical safety recommendations.'
+            : isRelationship
             ? 'Adjust cooling-off time, fault ownership, or boundary factors to simulate different scenarios.'
             : 'Adjust parameters to see how recommendations change in real time.'}
         </p>
       </div>
 
-      {isRelationship ? (
+      {isHealth ? (
+        <>
+          {/* Health Condition */}
+          <div>
+            <label className="label">Primary Condition / Symptoms</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { id: 'diarrhea', label: 'Diarrhea / Loose Stool' },
+                { id: 'nausea_vomiting', label: 'Nausea & Vomiting' },
+                { id: 'acidity', label: 'Acidity & Heartburn' },
+                { id: 'general_recovery', label: 'General Recovery' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setHealthCondition(opt.id)}
+                  className={`py-2 px-2 rounded-lg text-xs font-medium border transition-all text-center ${
+                    healthCondition === opt.id
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-charcoal-800 border-charcoal-700 text-charcoal-400 hover:border-charcoal-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Duration */}
+          <div>
+            <label className="label">Symptom Duration</label>
+            <div className="flex gap-2">
+              {[
+                { id: 'under_24h', label: '< 24 Hours' },
+                { id: '1_to_3_days', label: '1–3 Days' },
+                { id: 'over_3_days', label: '> 3 Days (Warning)' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setHealthDuration(opt.id)}
+                  className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all ${
+                    healthDuration === opt.id
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-charcoal-800 border-charcoal-700 text-charcoal-400 hover:border-charcoal-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Critical Red Flag Screening */}
+          <div>
+            <label className="label">Critical Red Flags (High fever, blood in stool, sharp pain)</label>
+            <div className="flex gap-2">
+              {[
+                { id: 'no', label: 'None (Bland Home Diet Safe)' },
+                { id: 'yes', label: '⚠️ Yes (Requires Doctor Consult)' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setHealthRedFlags(opt.id)}
+                  className={`flex-1 py-2 rounded-lg text-xs sm:text-sm font-medium border transition-all ${
+                    healthRedFlags === opt.id
+                      ? opt.id === 'yes'
+                        ? 'bg-red-500/20 border-red-500/50 text-red-300'
+                        : 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-charcoal-800 border-charcoal-700 text-charcoal-400 hover:border-charcoal-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Dehydration Risk */}
+          <div>
+            <label className="label">Dehydration Level</label>
+            <div className="flex gap-2">
+              {[
+                { id: 'low', label: 'Low (Tolerating sips)' },
+                { id: 'medium', label: 'Medium (Frequent loss)' },
+                { id: 'high', label: 'High (Dark urine, dry mouth)' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setDehydrationRisk(opt.id)}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium border transition-all ${
+                    dehydrationRisk === opt.id
+                      ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                      : 'bg-charcoal-800 border-charcoal-700 text-charcoal-400 hover:border-charcoal-600'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      ) : isRelationship ? (
         <>
           {/* Cooling-off period slider */}
           <div>

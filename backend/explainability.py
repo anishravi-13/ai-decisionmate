@@ -42,6 +42,7 @@ def generate_explanation(
         "career": f"This decision is influenced by market demand, skill alignment, and financial readiness.",
         "relationship": f"In interpersonal disputes, respecting explicit boundaries and allowing emotional cooling-off are the highest-leverage strategies to preserve the relationship.",
         "personal": f"For personal decisions, emotional safety, personal boundaries, and support network health are vital.",
+        "health": f"For acute gastrointestinal symptoms, fluid and electrolyte preservation takes precedence over caloric intake, followed by gentle, low-residue binding foods.",
         "general": f"The recommendation reflects the best match across your stated criteria.",
     }
     context = context_map.get(category, context_map["general"])
@@ -95,6 +96,11 @@ def compute_factor_contributions(
         "time_fit": "Care & Grooming Commitment",
         "budget_fit": "Maintenance Cost Fit",
         "temperament_fit": "Temperament & Lifestyle Fit",
+        "hydration_priority": "Hydration & Electrolyte Balance",
+        "digestive_rest": "Digestive Rest & Bland Diet",
+        "stool_binding": "Stool-Binding Capability",
+        "irritant_avoidance": "Irritant Avoidance (No Dairy/Fat)",
+        "medical_safety": "Clinical Safety & Red Flag Screening",
     }
 
     desc_map = {
@@ -120,6 +126,11 @@ def compute_factor_contributions(
         "time_fit": "Sufficient daily availability for walking, mental stimulation, and coat grooming",
         "budget_fit": "Alignment between expected monthly food, grooming, and vet costs and your budget",
         "temperament_fit": "How naturally the breed's inherent behavioral traits integrate into your household",
+        "hydration_priority": "Replacing lost water and vital salts (potassium, sodium) to prevent hypovolemic dehydration",
+        "digestive_rest": "Minimizing intestinal peristalsis and workload through gentle, low-residue foods",
+        "stool_binding": "Using soluble fibre (pectin) and simple starches (rice/toast) to firm bowel movements",
+        "irritant_avoidance": "Eliminating lactose, spicy seasonings, caffeine, and high-fat oils that trigger gut spasms",
+        "medical_safety": "Monitoring for critical red flags (fever >102F, blood in stool, severe cramps, duration >48h)",
     }
 
     factors = []

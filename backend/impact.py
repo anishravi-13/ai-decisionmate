@@ -187,6 +187,34 @@ CATEGORY_IMPACT_MAP = {
     },
     "relationship": RELATIONSHIP_IMPACTS,
     "personal": RELATIONSHIP_IMPACTS,
+    "health": {
+        "immediate": [
+            "Replenishes fluids and vital electrolytes (sodium, potassium) to prevent acute dehydration and fatigue.",
+            "Reduces intestinal motility and mechanical irritation with low-residue, bland foods (BRAT protocol).",
+            "Soothes the gastric lining and helps ease abdominal cramping within 4–12 hours.",
+        ],
+        "cost_impact": [
+            "Low-cost recovery: ORS sachets (₹5–₹20), bananas, white rice, and plain toast cost under ₹100.",
+            "Early oral rehydration eliminates the risk and heavy expense of emergency room IV fluid admission.",
+        ],
+        "long_term": [
+            "Protects intestinal barrier integrity and prepares gut for gradual microflora repopulation.",
+            "Helps pinpoint whether acute diarrhea was triggered by food intolerance, viral bug, or contaminated water.",
+        ],
+        "trade_offs": [
+            "Bland BRAT food lacks flavor and variety, but trades taste for immediate bowel stabilization.",
+            "Total food restriction/starvation is counter-productive; small sips of electrolytes and starch maintain gut lining cells.",
+        ],
+        "risks": [
+            "RED FLAG WARNING: Consult a physician immediately if you have high fever (>102°F/39°C), bloody/black stool, severe unremitting abdominal pain, or dehydration signs (dry mouth, dizziness, dark urine).",
+            "Avoid taking over-the-counter anti-diarrheal pills (e.g. Loperamide) if bacterial infection or fever is suspected without doctor guidance.",
+        ],
+        "maintenance": [
+            "Phase 1 (Hours 0–12): Sip ORS, electrolyte water, or clear salted broth every 15–30 minutes.",
+            "Phase 2 (Hours 12–36): Introduce BRAT diet foods (Bananas, white Rice, Applesauce, plain dry Toast, boiled potatoes).",
+            "Phase 3 (Hours 36–72): Slowly reintroduce plain curd (probiotics) and light soups; strictly avoid dairy, oily curries, caffeine, and raw salad for 4–5 days.",
+        ],
+    },
 }
 
 

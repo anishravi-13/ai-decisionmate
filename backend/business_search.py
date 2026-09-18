@@ -20,6 +20,7 @@ CATEGORY_SEARCH_TERMS = {
     "vehicle": "car dealership showroom",
     "relationship": "counseling center community center social club support group",
     "personal": "counseling center community center support group",
+    "health": "pharmacy medical clinic hospital urgent care medical store",
     "general": "electronics store general store",
 }
 
@@ -61,6 +62,12 @@ CATEGORY_SUGGESTIONS = {
         "Search 'counseling center near me' for professional guidance",
         "Explore local meditation, fitness, or hobby community groups",
         "Confidential support helplines (Tele-MANAS: 14416 / Vandrevala: +91 9999 666 555)",
+    ],
+    "health": [
+        "Search '24/7 pharmacy near me' on Google Maps to purchase ORS packets or medical supplies",
+        "Search 'general physician clinic near me' for outpatient consultation if symptoms persist >48h",
+        "Find nearby multi-specialty hospitals or urgent care clinics in case of severe dehydration or high fever",
+        "Government Health Helpline (India: 1075 / Emergency: 112) for immediate medical advice",
     ],
 }
 

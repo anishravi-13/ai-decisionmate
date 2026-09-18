@@ -30,7 +30,7 @@ class GuidedAnalyzeRequest(BaseModel):
             "laptop", "smartphone", "pc_components", "pet", "fish_aquarium",
             "education", "career", "travel", "home", "vehicle",
             "office_equipment", "product_purchase", "company_bulk", "relationship",
-            "personal", "general",
+            "personal", "health", "general",
         ]
         if v.lower() not in valid:
             raise ValueError(f"Category must be one of: {valid}")

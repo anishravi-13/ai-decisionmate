@@ -18,6 +18,7 @@ export const CATEGORIES = [
   { id: 'product_purchase', label: 'Product Purchase', emoji: '🛒', description: 'Any product recommendation' },
   { id: 'company_bulk', label: 'Company / Bulk Purchase', emoji: '🏢', description: 'Bulk procurement for organizations' },
   { id: 'relationship', label: 'Relationship & Friendship', emoji: '🤝', description: 'Navigate friendship, family, or relationship conflicts' },
+  { id: 'health', label: 'Health & Recovery', emoji: '💊', description: 'Evidence-based recovery & nutrition guidance' },
   { id: 'general', label: 'General Decision', emoji: '🤔', description: 'Any real-world decision' },
 ]
 
@@ -538,6 +539,55 @@ export const CATEGORY_QUESTIONS = {
       required: false,
       min: 0,
       max: 60,
+    },
+  ],
+
+  health: [
+    {
+      id: 'condition',
+      label: 'What primary condition or symptoms are you experiencing?',
+      type: 'radio',
+      required: true,
+      options: [
+        { value: 'diarrhea', label: 'Diarrhea / Loose stools / Upset stomach' },
+        { value: 'vomiting', label: 'Nausea & Vomiting' },
+        { value: 'fever', label: 'Mild Fever & Weakness' },
+        { value: 'stomach_pain', label: 'Abdominal Cramping / Gas' },
+        { value: 'general_recovery', label: 'Post-illness / general recovery' },
+      ],
+    },
+    {
+      id: 'duration_days',
+      label: 'How many days have you had these symptoms?',
+      type: 'number',
+      placeholder: 'e.g. 1',
+      required: true,
+      min: 0,
+      max: 60,
+    },
+    {
+      id: 'red_flags',
+      label: 'Do you have any critical red-flag symptoms?',
+      type: 'checkboxes',
+      required: false,
+      options: [
+        { value: 'blood_in_stool', label: '⚠️ Blood or black stool' },
+        { value: 'high_fever', label: '⚠️ High fever (> 102°F / 38.9°C)' },
+        { value: 'cannot_keep_fluids', label: '⚠️ Inability to keep any water down (> 12 hrs)' },
+        { value: 'severe_pain', label: '⚠️ Severe, sharp, localized abdominal pain' },
+        { value: 'dizziness', label: '⚠️ Extreme dizziness or fainting upon standing' },
+      ],
+    },
+    {
+      id: 'fluid_intake',
+      label: 'Current hydration / fluid retention status?',
+      type: 'radio',
+      required: false,
+      options: [
+        { value: 'tolerating_fluids', label: 'Tolerating small sips of water / ORS comfortably' },
+        { value: 'frequent_losses', label: 'High fluid loss (loose stools every 1-2 hours)' },
+        { value: 'mild_thirst', label: 'Mild thirst, normal urination' },
+      ],
     },
   ],
 
