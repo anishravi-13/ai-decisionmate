@@ -893,6 +893,63 @@ def generate_laptop_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
     return {"recommendation": rec_name, "category": "laptop"}
 
 
+def generate_phone_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
+    budget = _safe_float(answers.get("budget", 0))
+    os_pref = str(answers.get("os_preference", "any")).lower()
+    priority = str(answers.get("priority", answers.get("performance_priority", "balanced"))).lower()
+
+    if budget >= 70000:
+        if "android" in os_pref:
+            rec = "Samsung Galaxy S24 Ultra (512GB) — Premium Android flagship with top-tier camera zoom and display"
+        else:
+            rec = "Apple iPhone 15 Pro (128GB) — Flagship iOS smartphone with A17 Pro chip and titanium build"
+    elif budget >= 45000:
+        if "ios" in os_pref or priority in ["performance", "longevity"]:
+            rec = "Apple iPhone 13 (128GB variant) — Unmatched performance longevity, A15 Bionic chip, and class-leading video recording"
+        else:
+            rec = "OnePlus 12R 5G (256GB) — Flagship Snapdragon 8 Gen 2 performance with 100W SuperVOOC fast charging"
+    elif budget >= 28000:
+        if priority in ["camera"]:
+            rec = "Google Pixel 7a 5G — Exceptional computational photography and clean Android experience"
+        else:
+            rec = "Redmi Note 13 Pro+ 5G — 200MP OIS camera with 120W fast charging and curved 1.5K AMOLED display"
+    elif budget >= 18000:
+        if priority in ["battery", "reliability"]:
+            rec = "Samsung Galaxy M34 5G — Massive 6000mAh battery with 120Hz Super AMOLED display and Knox security"
+        else:
+            rec = "OnePlus Nord CE3 Lite 5G — Smooth 120Hz display with 67W fast charging and clean OxygenOS"
+    else:
+        rec = "Samsung Galaxy M34 5G — Best value all-rounder with long battery life and dependable software support"
+
+    return {"recommendation": rec, "category": "smartphone"}
+
+
+def generate_pc_components_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
+    budget = _safe_float(answers.get("budget", 0))
+    priority = str(answers.get("priority", "performance")).lower()
+
+    if budget >= 120000:
+        rec = "AMD Ryzen 7 7800X3D + NVIDIA RTX 4070 Ti Super 16GB Build — Elite 1440p/4K high-FPS gaming and creator powerhouse"
+    elif budget >= 55000:
+        rec = "AMD Ryzen 5 7600 + NVIDIA RTX 4060 8GB Build — Excellent AM5 modern architecture with high gaming and multi-tasking performance"
+    else:
+        rec = "AMD Ryzen 5 5600 + Radeon RX 6600 8GB Build — Best budget-to-performance 1080p gaming workstation"
+
+    return {"recommendation": rec, "category": "pc_components"}
+
+
+def generate_education_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
+    req = str(answers.get("requirements", answers.get("topic", "programming"))).lower()
+    if any(w in req for w in ["python", "code", "programming", "software"]):
+        rec = "Complete Python Pro Bootcamp + Harvard CS50 — Foundational mastery of algorithms and hands-on portfolio projects"
+    elif any(w in req for w in ["web", "frontend", "react"]):
+        rec = "Meta Front-End Developer Professional Certificate (Coursera) — Comprehensive React and modern web development"
+    else:
+        rec = "Google IT Automation Professional Certificate — Practical, high-demand automation and technical problem-solving"
+
+    return {"recommendation": rec, "category": "education"}
+
+
 def generate_company_bulk_recommendation(answers: Dict[str, Any]) -> Dict[str, Any]:
     budget = _safe_float(answers.get("total_budget", 0) or answers.get("budget", 0))
     quantity = _safe_int(answers.get("quantity", 1))
@@ -1086,6 +1143,15 @@ def run_decision_engine(category: str, answers: Dict[str, Any], query: str = "")
     if cat == "laptop":
         factors, avg_score = score_laptop(answers)
         rec_data = generate_laptop_recommendation(answers)
+    elif cat in ["smartphone", "phone"]:
+        factors, avg_score = score_general(cat, answers)
+        rec_data = generate_phone_recommendation(answers)
+    elif cat in ["pc_components", "desktop"]:
+        factors, avg_score = score_general(cat, answers)
+        rec_data = generate_pc_components_recommendation(answers)
+    elif cat == "education":
+        factors, avg_score = score_general(cat, answers)
+        rec_data = generate_education_recommendation(answers)
     elif cat == "company_bulk":
         factors, avg_score = score_company_bulk(answers)
         rec_data = generate_company_bulk_recommendation(answers)
@@ -1120,7 +1186,7 @@ def run_decision_engine(category: str, answers: Dict[str, Any], query: str = "")
     # Products
     budget = _safe_float(answers.get("budget") or answers.get("total_budget"))
     quantity = _safe_int(answers.get("quantity", 1))
-    products = _generate_product_cards(cat, answers, budget, quantity)
+    products = _generate_product_cards(cat, answers, budget, quantity, recommendation=recommendation)
 
     # Quantity
     qty = quantity
@@ -1358,98 +1424,237 @@ def _generate_alternatives(category: str, answers: Dict[str, Any], base_score: f
         ]
 
 
-def _generate_product_cards(category: str, answers: Dict[str, Any], budget: float, quantity: int) -> List[ProductCard]:
-    """Generate product cards from demo catalog."""
-    from product_catalog import get_products_for_category
-    products = get_products_for_category(category, budget if budget > 0 else None, quantity)
+def _generate_product_cards(
+    category: str,
+    answers: Dict[str, Any],
+    budget: float,
+    quantity: int,
+    recommendation: str = "",
+) -> List[ProductCard]:
+    """Generate product cards from demo catalog strictly related to the recommendation."""
+    from product_catalog import get_products_for_category, CATEGORY_PRODUCT_MAP
+
+    cat = category.lower().strip()
+    products = get_products_for_category(cat, budget if budget > 0 else None, quantity)
+    if not products:
+        products = CATEGORY_PRODUCT_MAP.get(cat, [])
+    if not products:
+        products = CATEGORY_PRODUCT_MAP.get("product_purchase", [])
+
+    rec_lower = recommendation.lower()
+    answers_str = " ".join(str(v).lower() for v in answers.values())
+    combined_ctx = f"{rec_lower} {answers_str}"
+
+    # Strict subtype filtering so user only gets products matching their topic/breed/ecosystem
+    if cat == "pet":
+        is_dog = any(k in combined_ctx for k in ["dog", "puppy", "retriever", "labrador", "shepherd", "beagle", "indie", "pug", "shih", "desi"])
+        is_cat = any(k in combined_ctx for k in ["cat", "kitten", "persian", "siamese"])
+        if is_dog and not is_cat:
+            products = [p for p in products if "cat" not in [t.lower() for t in p.get("tags", [])] or "dog" in [t.lower() for t in p.get("tags", [])]]
+        elif is_cat and not is_dog:
+            products = [p for p in products if "dog" not in [t.lower() for t in p.get("tags", [])] or "cat" in [t.lower() for t in p.get("tags", [])]]
+
+    elif cat in ["smartphone", "phone"]:
+        is_apple = any(k in combined_ctx for k in ["iphone", "apple", "ios"])
+        is_android = any(k in combined_ctx for k in ["android", "samsung", "oneplus", "pixel", "redmi", "xiaomi"])
+        if is_apple and not is_android:
+            apple_prods = [p for p in products if "apple" in [t.lower() for t in p.get("tags", [])] or "ios" in [t.lower() for t in p.get("tags", [])] or "iphone" in p.get("name", "").lower()]
+            if apple_prods:
+                products = apple_prods
+        elif is_android and not is_apple:
+            android_prods = [p for p in products if "ios" not in [t.lower() for t in p.get("tags", [])] and "apple" not in [t.lower() for t in p.get("tags", [])] and "iphone" not in p.get("name", "").lower()]
+            if android_prods:
+                products = android_prods
+
     cards = []
-    for p in products[:5]:  # Top 5
-        # Compute match percentage
-        match = _compute_product_match(p, answers, category)
-        why = _generate_why_match(p, answers, category, match)
-        tradeoffs = _generate_product_tradeoffs(p, category)
+    for p in products:
+        match = _compute_product_match(p, answers, cat, recommendation)
+        why = _generate_why_match(p, answers, cat, match, recommendation)
+        tradeoffs = _generate_product_tradeoffs(p, cat)
         cards.append(ProductCard(
-            id=p["id"],
-            name=p["name"],
+            id=str(p["id"]),
+            name=str(p["name"]),
             price=p.get("price"),
-            rating=p.get("rating"),
+            rating=float(p.get("rating", 4.5)),
             specs=p.get("specs", {}),
             match_pct=match,
             why_match=why,
             trade_offs=tradeoffs,
             demo_data=True,
         ))
-    # Sort by match
+
+    # Sort so closest match to recommendation is at the top
     cards.sort(key=lambda c: c.match_pct, reverse=True)
-    return cards
+
+    # If the recommendation specified a distinct product not already at >= 92% match, synthesize Rank #1
+    top_score = cards[0].match_pct if cards else 0.0
+    if recommendation and top_score < 92.0:
+        clean_name = re.sub(r"^(recommendation:?\s*|suggested:?\s*|buy:?\s*|recommendation set to:?\s*)", "", recommendation, flags=re.IGNORECASE).split(" — ")[0].split(". ")[0].strip()
+        if len(clean_name) > 65:
+            clean_name = clean_name[:62] + "..."
+        price_est = f"₹{int(budget):,} (est.)" if budget > 0 else "Market price (est.)"
+        synth_card = ProductCard(
+            id="rec_primary_1",
+            name=clean_name,
+            price=price_est,
+            rating=4.8,
+            specs={"selection_tier": "Primary Recommendation", "budget_status": "Fits Target Budget"},
+            match_pct=98.0,
+            why_match="Exact primary recommendation chosen for your specific requirements.",
+            trade_offs=["Verify current retailer stock and warranty coverage before purchase."],
+            demo_data=True,
+        )
+        cards.insert(0, synth_card)
+
+    return cards[:4]
 
 
-def _compute_product_match(product: Dict[str, Any], answers: Dict[str, Any], category: str) -> float:
-    """Compute a match percentage for a product."""
-    score = 60.0  # Base
+def _compute_product_match(
+    product: Dict[str, Any],
+    answers: Dict[str, Any],
+    category: str,
+    recommendation: str = "",
+) -> float:
+    """Compute an intelligent match percentage for a product against user criteria and recommendation."""
     cat = category.lower()
+    rec_lower = recommendation.lower()
+    prod_name = product.get("name", "").lower()
+    tags = [t.lower() for t in product.get("tags", [])]
+    budget = _safe_float(answers.get("budget", 0) or answers.get("total_budget", 0))
 
-    if cat == "laptop":
-        budget = _safe_float(answers.get("budget", 0))
-        gaming = str(answers.get("gaming_requirement", "no")).lower() in ["yes", "true", "1"]
-        ai_ml = str(answers.get("ai_ml_requirement", "no")).lower() in ["yes", "true", "1"]
-        portability = str(answers.get("portability", "medium")).lower()
+    score = 75.0
 
-        price = product.get("price_num", 0)
-        if budget > 0 and price > 0:
-            if price <= budget:
-                score += 15
-            elif price <= budget * 1.1:
-                score += 5
-            else:
-                score -= 20
+    # 1. Direct Recommendation match
+    prod_tokens = [t for t in re.split(r"[\s\(\)\,\-\/]+", prod_name) if len(t) > 2 and t not in ["the", "and", "for", "with", "est", "series"]]
+    token_matches = sum(1 for t in prod_tokens if t in rec_lower)
 
-        if gaming and product.get("gaming", 0) >= 3:
-            score += 15
-        elif gaming and product.get("gaming", 0) < 2:
-            score -= 10
+    if prod_name in rec_lower or (len(prod_tokens) > 1 and all(t in rec_lower for t in prod_tokens[:2])):
+        score = 99.0
+    elif token_matches >= 3:
+        score = 96.0
+    elif token_matches >= 2:
+        score = 92.0
+    elif token_matches >= 1:
+        score = 88.0
 
-        if ai_ml and product.get("ai_ml", 0) >= 3:
-            score += 10
-        if portability == "high" and product.get("portability", 3) >= 4:
-            score += 10
-        elif portability == "high" and product.get("portability", 3) <= 2:
-            score -= 10
+    # Brand / Model Family boost
+    key_brands = [
+        "apple", "iphone", "samsung", "galaxy", "oneplus", "pixel", "google",
+        "lenovo", "asus", "dell", "hp", "acer", "macbook",
+        "ryzen", "intel", "nvidia", "rtx", "corsair",
+        "royal canin", "whiskas", "kong", "furminator", "barkbutler",
+        "python", "harvard", "cs50", "coursera", "meta",
+        "dyson", "ather", "hunter", "omron", "electral", "american tourister"
+    ]
+    for b in key_brands:
+        if b in rec_lower and (b in prod_name or b in tags):
+            score = max(score, 88.0)
+            if b in ["iphone", "rtx", "ryzen", "python", "hunter", "ather"]:
+                score = max(score, 95.0)
 
-    return round(min(max(score, 0), 100), 1)
+    # 2. Accessory boost for primary ecosystem
+    if ("iphone" in rec_lower or "apple" in rec_lower) and ("charger" in tags or "case" in tags or "accessory" in tags):
+        score = max(score, 88.0)
+    if "dog" in rec_lower and ("grooming" in tags or "enrichment" in tags or "food" in tags):
+        score = max(score, 86.0)
 
-
-def _generate_why_match(product: Dict[str, Any], answers: Dict[str, Any], category: str, match: float) -> str:
-    reasons = []
-    if match >= 80:
-        reasons.append("Strongly aligns with your requirements")
-    elif match >= 65:
-        reasons.append("Good overall match for your stated needs")
-    else:
-        reasons.append("Partial match — consider alternatives")
-
-    budget = _safe_float(answers.get("budget", 0))
+    # 3. Budget compatibility
     price = product.get("price_num", 0)
-    if budget > 0 and price > 0 and price <= budget:
-        reasons.append("fits within your budget")
-    if product.get("gaming", 0) >= 3 and str(answers.get("gaming_requirement", "no")).lower() in ["yes", "true"]:
-        reasons.append("has dedicated gaming GPU")
-    if product.get("portability", 3) >= 4:
-        reasons.append("is highly portable")
+    if budget > 0 and price > 0:
+        if price <= budget:
+            score = min(score + 3, 99.0)
+        elif price <= budget * 1.15:
+            score = max(score - 3, 55.0)
+        else:
+            score = max(score - 15, 45.0)
 
-    return "; ".join(reasons).capitalize() + "."
+    return round(min(max(score, 50.0), 99.0), 1)
+
+
+def _generate_why_match(
+    product: Dict[str, Any],
+    answers: Dict[str, Any],
+    category: str,
+    match: float,
+    recommendation: str = "",
+) -> str:
+    rec_lower = recommendation.lower()
+    prod_lower = product.get("name", "").lower()
+    tags = [t.lower() for t in product.get("tags", [])]
+
+    if match >= 95:
+        return f"Direct primary recommendation matching your exact {category.replace('_', ' ')} requirements."
+    elif "charger" in prod_lower or "adapter" in prod_lower:
+        return "Essential fast-charging accessory ensuring optimal battery health and longevity."
+    elif "case" in prod_lower or "cover" in prod_lower:
+        return "Certified shock-absorbent protective case custom-fitted for your device."
+    elif "food" in prod_lower:
+        return "Nutritionally balanced veterinarian-recommended diet tailored for this breed."
+    elif "grooming" in prod_lower or "shedding" in prod_lower or "brush" in prod_lower:
+        return "Specialized grooming tool designed to reduce coat shedding and keep skin healthy."
+    elif "toy" in prod_lower or "chew" in prod_lower or "enrichment" in prod_lower:
+        return "Durable mental stimulation toy to keep your pet active and prevent anxiety."
+    elif "bed" in prod_lower:
+        return "Orthopedic support bed providing joint and spine relief for growing breeds."
+    elif match >= 85:
+        return "Top-tier direct alternative sharing core specs and performance with the primary choice."
+    elif match >= 75:
+        return "High-value alternative in the same category offering an attractive price-to-performance ratio."
+    else:
+        return "Budget-friendly option suitable for everyday requirements."
 
 
 def _generate_product_tradeoffs(product: Dict[str, Any], category: str) -> List[str]:
     tradeoffs = []
-    if category == "laptop":
-        if product.get("gaming", 0) >= 3:
-            tradeoffs.append("Heavier than ultrabooks; limited battery life under gaming load")
-        if product.get("portability", 3) >= 4:
-            tradeoffs.append("Compact screen may feel small for extended sessions")
-        if product.get("performance_tier", 3) <= 2:
-            tradeoffs.append("May struggle with heavy multitasking or demanding applications in 2–3 years")
-    return tradeoffs or ["Review full spec sheet before purchasing"]
+    cat = category.lower()
+    name = product.get("name", "").lower()
+    tags = [t.lower() for t in product.get("tags", [])]
+
+    if "iphone" in name:
+        tradeoffs.append("Standard 60Hz display refresh; wall charger and adapter sold separately.")
+    elif "samsung" in name or "android" in tags:
+        tradeoffs.append("Pre-installed vendor applications may require manual organization.")
+    elif "pixel" in name:
+        tradeoffs.append("Charging speed capped at 18W; battery life is standard 1-day.")
+    elif cat == "laptop":
+        if product.get("gaming", 0) >= 3 or "gaming" in tags:
+            tradeoffs.append("Heavier chassis (2.2+ kg); battery life typically 4-5 hours under heavy load.")
+        elif product.get("portability", 3) >= 4 or "ultrabook" in tags:
+            tradeoffs.append("RAM is soldered; select adequate memory upfront.")
+        else:
+            tradeoffs.append("Standard display brightness (250 nits); recommended for indoor use.")
+    elif cat in ["pc_components", "desktop"]:
+        if "cpu" in tags:
+            tradeoffs.append("Requires compatible AM5/LGA1700 motherboard and DDR5 RAM.")
+        elif "gpu" in tags:
+            tradeoffs.append("Requires dedicated 750W+ power supply and adequate case clearance.")
+        else:
+            tradeoffs.append("Ensure motherboard BIOS is updated for full hardware stability.")
+    elif cat == "education":
+        tradeoffs.append("Requires 5–8 hours/week disciplined commitment for full project completion.")
+    elif cat == "pet":
+        if "grooming" in tags or "brush" in tags or "shedding" in tags or "furminator" in name:
+            tradeoffs.append("Requires consistent weekly brushing; use gentle strokes along natural coat direction.")
+        elif "toy" in tags or "chew" in tags or "kong" in name:
+            tradeoffs.append("Inspect regularly for signs of wear; clean with warm water after outdoor play.")
+        elif "bed" in tags or "bed" in name:
+            tradeoffs.append("Measure your pet's sleeping posture to ensure full ergonomic support.")
+        elif "food" in tags or "diet" in tags:
+            tradeoffs.append("Transition gradually over 7 days when changing foods to avoid digestive upset.")
+        else:
+            tradeoffs.append("Ensure sizing and materials match your pet's age, weight, and activity level.")
+    elif cat == "travel":
+        tradeoffs.append("Check individual airline dimensions for strict cabin baggage compliance.")
+    elif cat == "home":
+        tradeoffs.append("Professional installation and water pressure check recommended upon delivery.")
+    elif cat == "vehicle":
+        tradeoffs.append("Schedule a physical dealership test-drive to verify ergonomic comfort.")
+    elif cat == "health":
+        tradeoffs.append("Dietary aid only — consult a physician if symptoms do not improve within 48 hours.")
+    else:
+        tradeoffs.append("Review full specifications and return window before final purchase.")
+
+    return tradeoffs
 
 
 def _generate_follow_up_questions(category: str, answers: Dict[str, Any]) -> List[str]:
