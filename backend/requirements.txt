@@ -1,0 +1,15 @@
+# AI DecisionMate — Backend Requirements
+# Python 3.11+ required. Python 3.14 also supported.
+# Note: scikit-learn and numpy are optional (not used in core engine).
+# If you have Python 3.11/3.12/3.13, you can add:
+#   scikit-learn==1.5.0
+#   numpy==1.26.4
+# For Python 3.14, these may not have pre-built wheels yet.
+
+fastapi>=0.111.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
+sqlalchemy>=2.0.30
+python-multipart>=0.0.9
+httpx>=0.27.0
+python-dotenv>=1.0.0

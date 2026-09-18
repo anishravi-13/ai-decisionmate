@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-body bg-charcoal-950 text-charcoal-100;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-charcoal-900 border border-charcoal-800 rounded-2xl shadow-card;
+  }
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-card-hover hover:border-charcoal-700;
+  }
+  .btn-primary {
+    @apply bg-amber-500 hover:bg-amber-400 text-charcoal-950 font-semibold px-6 py-3 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md active:scale-95;
+  }
+  .btn-secondary {
+    @apply bg-charcoal-800 hover:bg-charcoal-700 text-charcoal-100 font-medium px-6 py-3 rounded-xl border border-charcoal-700 transition-all duration-200;
+  }
+  .btn-danger {
+    @apply bg-red-600 hover:bg-red-500 text-white font-medium px-4 py-2 rounded-lg transition-all duration-200;
+  }
+  .input-field {
+    @apply w-full bg-charcoal-800 border border-charcoal-700 rounded-xl px-4 py-3 text-charcoal-100 placeholder-charcoal-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all duration-200;
+  }
+  .label {
+    @apply block text-sm font-medium text-charcoal-300 mb-1.5;
+  }
+  .section-title {
+    @apply font-heading text-xl font-semibold text-charcoal-100;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  .confidence-ring {
+    @apply relative inline-flex items-center justify-center;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-amber-400 to-amber-200 bg-clip-text text-transparent;
+  }
+  .border-gradient {
+    border-image: linear-gradient(135deg, #f59e0b, #10b981) 1;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #464f60 #2c313c;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: #2c313c;
+    border-radius: 3px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #464f60;
+    border-radius: 3px;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom range slider */
+input[type="range"] {
+  @apply appearance-none h-2 rounded-full outline-none cursor-pointer;
+  background: linear-gradient(to right, #f59e0b var(--value, 50%), #3d4452 var(--value, 50%));
+}
+input[type="range"]::-webkit-slider-thumb {
+  @apply appearance-none w-5 h-5 rounded-full bg-amber-400 border-2 border-charcoal-900 cursor-pointer shadow-md;
+}
+input[type="range"]::-moz-range-thumb {
+  @apply w-5 h-5 rounded-full bg-amber-400 border-2 border-charcoal-900 cursor-pointer shadow-md;
+  border: 2px solid #1a1d24;
+  background: #fbbf24;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+}
